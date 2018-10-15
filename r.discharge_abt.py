@@ -282,13 +282,10 @@ def main():
 		
 	
 	
-	new.write(Point( xoutlet , youtlet ), cat=1, 
-		attrs=(str(Qc))
+	new.write(Point( xoutlet , youtlet ), (float(Qc),) )
 	new.table.conn.commit()
 	new.table.execute().fetchall()
 	new.close()
-
-	
 	
 	#cleaning part
 	if elev_renamed:
