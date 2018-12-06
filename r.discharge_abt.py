@@ -53,9 +53,91 @@ from grass.pygrass.vector import VectorTopo
 from grass.pygrass.vector.geometry import Point
 from grass.pygrass.modules.shortcuts import general as g
 
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm,mm
+from reportlab.lib import utils
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
+
+import time
+
+
 if "GISBASE" not in os.environ:
 	print "You must be in GRASS GIS to run this program."
 	sys.exit(1)
+
+def FirsPage(formula='Giandotti',xoutlet=345876.0,youtlet=4745996.0,Tc=0.01,AreaBasin=88.84,ChLen=2274,
+			MeanElev=379.85,a=27.455,b=0.396,k=0.5,TR=50,f=2.335,h=10.27,
+			h_ar=8.8,x1=4.15,x2=0.023,Pa=85.744,
+			CN=66,S1=5.0,Pn=2.4,Qc=62.66):
+	
+	elements = []
+	styles = getSampleStyleSheet()
+	P0 = Paragraph("<b>Calculation of peack-flow</b><br/><font size=12><i>Flood Estimation Handbook of River Tiber Basin Authority</i></font>", styles['Heading1'])
+	#~ P0.append(Paragraph("Very <i>Special</i>!",styles['Normal']))
+	# ~ P1 = Paragraph('''<font size=8>Committente: Regione Umbria <br/></font>
+	                  # ~ <br/>
+	                  # ~ <u><font size=10 color=red>Frana : </font></u>
+	               # ~ ''',styles['Normal'])
+	P1 = Paragraph('''<font size=10>The present report contains the details of the calculation used to determinate the peak-flow to the specied outlet coordination.<br/>
+					The procedure used corresponds to the one proposed in the flood estimation Handbook of River Tiber basin Autority.<br/>
+					We accept no resposability for the provided data and for any damages deriving from their use.</font>
+					''',styles['Normal'])
+	
+	P2 = Paragraph('''<font size=12>Calculation Report<br/>
+	                  Coordinates  outlet (UTM Z33 ED 50)<br/>
+	                  East %.2f - North %.2f<br/></font>'''%(xoutlet,youtlet),styles['Normal'])
+	data= [[P0, 'Data:   '+str(time.ctime())],
+	
+	       [P1, P2]]
+	t=Table(data,2*[9.5*cm], 2*[3.5*cm])
+	t.setStyle(TableStyle([('GRID',(0,0),(1,-2),1,colors.grey),
+                       ('BOX',(0,0),(1,-1),2,colors.black),        
+                       ('SPAN',(1,-1),(-1,-1))]))
+                       
+	elements.append(t)
+	elements.append(Spacer(2*cm, 2*cm))
+	
+	para2=ParagraphStyle('Normal',alignment=TA_LEFT, fontName = 'Helvetica', fontSize = 12)
+	
+	elements.append(Paragraph('According to %s formula, the runoff time Tc is:<br/>'%(formula), para2))
+	
+	elements.append(Paragraph('''Tc = <b>%.2f</b> hours
+							'''%(Tc),para2))
+	elements.append(Paragraph('''<br/>with:<br/><br/>
+							
+							basin area = <b>%.2f</b> ha<br/>
+							Main channel length = <b>%.2f</b> m<br/>
+							Average height (with regard to outlet section) = <b>%.2f</b> m .a.s.l.<br/><br/>
+						'''%(AreaBasin,ChLen,MeanElev),para2))
+	
+	elements.append(Paragraph('''from the basin area:<br/>
+							a = <b>%.2f</b><br/>
+							b = <b>%.2f</b> <br/>
+							k = <b>%.2f</b> m <br/>
+						<br/><br/>'''%(a,b,k),para2))
+						
+	elements.append(Paragraph('''The function f(K,T) with runoff time Tr = %d year is = <b>%.2f</b><br/><br/>
+							local rainfall height (h=aD<sup>b</sup>f) = <b>%.2f</b> mm<br/><br/>
+							with D = Tc<br/><br/>
+							Area rainfall height Ha = <b>%.2f</b> mm<br/><br/>with:<br/>
+							x1 = <b>%.2f</b><br/>
+							x2 = <b>%.2f</b><br/>
+							Pa = <b>%.2f</b><br/><br/>
+							Net rainfall Pn = <b>%.2f</b><br/><br/>with:<br/>
+							CN = <b>%.2f</b><br/>
+							S1 = <b>%.2f</b><br/><br/>
+							<b>Peak flow Qc = %.2f m<sup>3</sup>/s</b>'''%(TR,f,h,h_ar,x1,x2,Pa,Pn,CN,S1,Qc),para2))
+	
+	# write the document to disk
+	#elements.append(Spacer(2*cm, 2*cm))
+
+	doc = SimpleDocTemplate("/tmp/simple_table.pdf", pagesize=A4,rightMargin=1*cm,leftMargin=1*cm,topMargin=2*cm,bottomMargin=2*cm,title=str('Abt Report'))
+	doc.build(elements)
+
 
 def main():
 	dem=options['dem']
@@ -109,6 +191,7 @@ def main():
 	network_statistics[-1].split()
 	total_length=float(network_statistics[-1].split(',')[2])
 	area_basin=float(network_statistics[-1].split(',')[3])
+	#area_basin in km2
 	area_basin_Ha=area_basin*100
 	mean_elev=float(main_stat[3].split(':')[-1])
 	min_elev=float(main_stat[0].split(':')[-1])
@@ -118,18 +201,19 @@ def main():
 	grass.run_command('r.mask',flags='r')
 	
 	TcGiandotti=(4*np.sqrt(area_basin)+1.5*total_length)/(0.8*np.sqrt(mean_elev-min_elev))
-	g.message("TC using Giandotti...")
-	grass.info(str(TcGiandotti))
-	
+
 	TcKirpich=0.945*(total_length**3./deltaH)**0.385
-	g.message("TC using Kirpich...")
-	grass.info(str(TcKirpich))
-	if area_basin_Ha > 100: #TODO controlla i riferimenti
+
+	if area_basin_Ha > 1000: #TODO controlla i riferimenti
 		corrivazione = TcGiandotti
 		grass.info('using giandotti')
+		grass.info(str(TcGiandotti))
+		formula = 'Giandotti'
 	else:
+		formula = 'Kirpich'
 		corrivazione = TcKirpich
 		grass.info('using Kirpich')
+		grass.info(str(TcKirpich))
 	if corrivazione < 24:
 		aPar='a24@PERMANENT'
 		bPar='b24@PERMANENT'
@@ -140,7 +224,7 @@ def main():
 		kPar='k15@PERMANENT'
 	CNmap = 'CN@PERMANENT'
 	
-	corrivazione=TcGiandotti
+	
 	aStat=grass.read_command('r.univar',map=aPar, zones='basin')
 	aMain_stat=aStat.splitlines()[12].split(':')[-1]	
 	aMain_stat=float(aMain_stat)
@@ -171,18 +255,29 @@ def main():
 	print 'CN mean:'
 	print CN
 	
+	##### ------------------------- ##### modifica per verifca da togliere
+	# ~ corrivazione=3.
+	# ~ aMain_stat=32.5
+	# ~ bMain_stat=0.33
+	# ~ kMain_stat=0.42
+	# ~ CN=90
+	# ~ area_basin=61.5
+	# ~ area_basin_Ha=area_basin*100
+	
+	#####--------------------------#####
+	
 	f_K_T = 1-kMain_stat*(0.45+0.799*np.log(-np.log(1-1./TR)))
 	print 'f(k,T): '
 	print f_K_T
 	
-	h=aMain_stat*corrivazione**bMain_stat*f_K_T
+	h=f_K_T*aMain_stat*corrivazione**bMain_stat
 	print '\n h main:'
 	print h
 	X1 = 100*corrivazione/(0.236+0.062*corrivazione)
 	X2 = 0.003*corrivazione+0.0234
 	Pa = 100 - area_basin_Ha/(X1+X2*area_basin_Ha)
 	Ha = h*Pa/100
-	S1 = (1000/CN)-10
+	S1 = (1000./CN)-10
 	Pn = (Ha-5.08*S1)**2/(Ha+20.32*S1)
 	Qc = (1/360.)*Pn*area_basin_Ha/corrivazione
 	
@@ -286,7 +381,12 @@ def main():
 	new.table.conn.commit()
 	new.table.execute().fetchall()
 	new.close()
-	
+	mean_elev_abs = mean_elev-min_elev
+	FirsPage(formula=formula,xoutlet=xoutlet,youtlet=youtlet,Tc=corrivazione,AreaBasin=area_basin_Ha,ChLen=total_length*1000.,
+			MeanElev=mean_elev_abs,a=aMain_stat,b=bMain_stat,k=kMain_stat,TR=TR,f=f_K_T,h=h,
+			h_ar=Ha,x1=X1,x2=X2,Pa=Pa,
+			CN=CN,S1=S1,Pn=Pn,Qc=Qc)
+			
 	#cleaning part
 	if elev_renamed:
 		grass.run_command('g.rename',raster='elevation,%s' % dem)
