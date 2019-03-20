@@ -44,6 +44,13 @@
 #% required: yes
 #%end
 
+#%option
+#% key: clean
+#% type: string
+#% description: leave temporary files
+#% required: no
+#%end
+
 import os
 import sys,time,math
 import numpy as np
@@ -72,17 +79,17 @@ if "GISBASE" not in os.environ:
 def FirsPage(formula='Giandotti',xoutlet=345876.0,youtlet=4745996.0,Tc=0.01,AreaBasin=88.84,ChLen=2274,
 			MeanElev=379.85,a=27.455,b=0.396,k=0.5,TR=50,f=2.335,h=10.27,
 			h_ar=8.8,x1=4.15,x2=0.023,Pa=85.744,
-			CN=66,S1=5.0,Pn=2.4,Qc=62.66):
+			CN=66,S1=5.0,Pn=2.4,Qc=62.66,dropElev=100):
 	
 	elements = []
 	styles = getSampleStyleSheet()
-	P0 = Paragraph("<b>Calculation of peack-flow</b><br/><font size=12><i>Flood Estimation Handbook of River Tiber Basin Authority</i></font>", styles['Heading1'])
+	P0 = Paragraph("<b>Calculation of peak-flow</b><br/><font size=12><i>Flood Estimation Handbook of River Tiber Basin Authority</i></font>", styles['Heading1'])
 	#~ P0.append(Paragraph("Very <i>Special</i>!",styles['Normal']))
 	# ~ P1 = Paragraph('''<font size=8>Committente: Regione Umbria <br/></font>
 	                  # ~ <br/>
 	                  # ~ <u><font size=10 color=red>Frana : </font></u>
 	               # ~ ''',styles['Normal'])
-	P1 = Paragraph('''<font size=10>The present report contains the details of the calculation used to determinate the peak-flow to the specied outlet coordination.<br/>
+	P1 = Paragraph('''<font size=10>The present report contains the details of the calculation used to determinate the peak-flow to the specified outlet coordination.<br/>
 					The procedure used corresponds to the one proposed in the flood estimation Handbook of River Tiber basin Autority.<br/>
 					We accept no resposability for the provided data and for any damages deriving from their use.</font>
 					''',styles['Normal'])
@@ -111,44 +118,54 @@ def FirsPage(formula='Giandotti',xoutlet=345876.0,youtlet=4745996.0,Tc=0.01,Area
 							
 							basin area = <b>%.2f</b> ha<br/>
 							Main channel length = <b>%.2f</b> m<br/>
-							Average height (with regard to outlet section) = <b>%.2f</b> m .a.s.l.<br/><br/>
-						'''%(AreaBasin,ChLen,MeanElev),para2))
+							Average height (with regard to outlet section) = <b>%.2f</b> m .a.s.l.<br/>
+							Drop in elevation of main channel DH = <b>%.2f</b> m<br/><br/>
+						'''%(AreaBasin,ChLen,MeanElev,dropElev),para2))
 	
 	elements.append(Paragraph('''from the basin area:<br/>
 							a = <b>%.2f</b><br/>
-							b = <b>%.2f</b> <br/>
-							k = <b>%.2f</b> m <br/>
+							b = <b>%.2f</b><br/>
+							k = <b>%.2f</b><br/>
 						<br/><br/>'''%(a,b,k),para2))
 						
-	elements.append(Paragraph('''The function f(K,T) with runoff time Tr = %d year is = <b>%.2f</b><br/><br/>
+	elements.append(Paragraph('''The function f(K,T) with return period RP = %d year is = <b>%.2f</b><br/><br/>
 							local rainfall height (h=aD<sup>b</sup>f) = <b>%.2f</b> mm<br/><br/>
 							with D = Tc<br/><br/>
-							Area rainfall height Ha = <b>%.2f</b> mm<br/><br/>with:<br/>
+							Areal rainfall height Ha = <b>%.2f</b> mm<br/><br/>with:<br/>
 							x1 = <b>%.2f</b><br/>
 							x2 = <b>%.2f</b><br/>
 							Pa = <b>%.2f</b><br/><br/>
 							Net rainfall Pn = <b>%.2f</b><br/><br/>with:<br/>
 							CN = <b>%.2f</b><br/>
-							S1 = <b>%.2f</b><br/><br/>
+							S' = <b>%.2f</b><br/><br/>
 							<b>Peak flow Qc = %.2f m<sup>3</sup>/s</b>'''%(TR,f,h,h_ar,x1,x2,Pa,Pn,CN,S1,Qc),para2))
 	
 	# write the document to disk
 	#elements.append(Spacer(2*cm, 2*cm))
 
-	doc = SimpleDocTemplate("/tmp/simple_table.pdf", pagesize=A4,rightMargin=1*cm,leftMargin=1*cm,topMargin=2*cm,bottomMargin=2*cm,title=str('Abt Report'))
+	doc = SimpleDocTemplate("/tmp/simple_table.pdf", pagesize=A4,rightMargin=0.5*cm,leftMargin=0.5*cm,topMargin=0.5*cm,bottomMargin=0.5*cm,title=str('Abt Report'))
 	doc.build(elements)
 
 
 def main():
+	print '1'
 	dem=options['dem']
 	TR=options['time'] #TODO Time of concentration
 	outlet=options['outlets']
 	outlets = outlet.split(',')
+	cleanTemporary = options['clean']
 	try:
 		TR=int(TR)
 	except:
 		print 'TR is not a number'
 		sys.exit()
+	print '1.1'
+	if cleanTemporary != 'no':
+		grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
+		
+		grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
+		grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
+	print '2'
 	grass.use_temp_region()
 	#get region in order to estimate the threshold as 1/1000 of total cells
 	grass.run_command('g.region',raster=dem)
@@ -172,6 +189,7 @@ def main():
 		list_tuple.append(my_tupla)
 	tuple_orderedByDistance=sorted(list_tuple, key=lambda distanza: distanza[2])
 	del(distances,list_tuple,list_dist)
+	print '3'	
 	#calculate the basin and read its statistics
 	outlet=tuple_orderedByDistance[0][-2:]
 	xoutlet=float(outlet[0])
@@ -260,10 +278,10 @@ def main():
 	# ~ aMain_stat=32.5
 	# ~ bMain_stat=0.33
 	# ~ kMain_stat=0.42
-	# ~ CN=90
+	# ~ CN=91.
 	# ~ area_basin=61.5
 	# ~ area_basin_Ha=area_basin*100
-	
+	CN = 70.12/82.63 * CN
 	#####--------------------------#####
 	
 	f_K_T = 1-kMain_stat*(0.45+0.799*np.log(-np.log(1-1./TR)))
@@ -277,7 +295,6 @@ def main():
 	X2 = 0.003*corrivazione+0.0234
 	Pa = 100 - area_basin_Ha/(X1+X2*area_basin_Ha)
 	Ha = h*Pa/100
-	new = VectorTopo('outlet')
 	S1 = (1000./CN)-10
 	Pn = (Ha-5.08*S1)**2/(Ha+20.32*S1)
 	Qc = (1/360.)*Pn*area_basin_Ha/corrivazione
@@ -345,7 +362,6 @@ def main():
 	#grass.mapcalc(  expr2 , overwrite=True)
 	#print expr3
 	grass.mapcalc(  expr3 , overwrite=True)    
-	new.close()
 	
 	'''
 	------------------------------
@@ -441,19 +457,21 @@ def main():
 	new.close()
 
 	mean_elev_abs = mean_elev-min_elev
-	FirsPage(formula=formula,xoutlet=xoutlet,youtlet=youtlet,Tc=corrivazione,AreaBasin=area_basin_Ha,ChLen=total_length*1000.,
-			MeanElev=mean_elev_abs,a=aMain_stat,b=bMain_stat,k=kMain_stat,TR=TR,f=f_K_T,h=h,
-			h_ar=Ha,x1=X1,x2=X2,Pa=Pa,
-			CN=CN,S1=S1,Pn=Pn,Qc=Qc)
+	#FirsPage(formula=formula,xoutlet=xoutlet,youtlet=youtlet,Tc=corrivazione,AreaBasin=area_basin_Ha,ChLen=total_length*1000.,
+#			MeanElev=mean_elev_abs,a=aMain_stat,b=bMain_stat,k=kMain_stat,TR=TR,f=f_K_T,h=h,
+#			h_ar=Ha,x1=X1,x2=X2,Pa=Pa,
+#			CN=CN,S1=S1,Pn=Pn,Qc=Qc,dropElev=deltaH)
 			
 	#cleaning part
 	if elev_renamed:
 		grass.run_command('g.rename',raster='elevation,%s' % dem)
 	grass.del_temp_region()
-	grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
-	
-	grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
-	grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
+	grass.run_command('r.to.vect',input='basin',output='basin1',type='area',overwrite=True)
+	if cleanTemporary != 'no':
+		grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
+		
+		grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
+		grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
 
 	    
 	

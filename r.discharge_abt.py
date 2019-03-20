@@ -44,6 +44,13 @@
 #% required: yes
 #%end
 
+#%option
+#% key: clean
+#% type: string
+#% description: leave temporary files
+#% required: no
+#%end
+
 import os
 import sys,time,math
 import numpy as np
@@ -76,7 +83,7 @@ def FirsPage(formula='Giandotti',xoutlet=345876.0,youtlet=4745996.0,Tc=0.01,Area
 	
 	elements = []
 	styles = getSampleStyleSheet()
-	P0 = Paragraph("<b>Calculation of peack-flow</b><br/><font size=12><i>Flood Estimation Handbook of River Tiber Basin Authority</i></font>", styles['Heading1'])
+	P0 = Paragraph("<b>Calculation of peak-flow</b><br/><font size=12><i>Flood Estimation Handbook of River Tiber Basin Authority</i></font>", styles['Heading1'])
 	#~ P0.append(Paragraph("Very <i>Special</i>!",styles['Normal']))
 	# ~ P1 = Paragraph('''<font size=8>Committente: Regione Umbria <br/></font>
 	                  # ~ <br/>
@@ -117,11 +124,11 @@ def FirsPage(formula='Giandotti',xoutlet=345876.0,youtlet=4745996.0,Tc=0.01,Area
 	
 	elements.append(Paragraph('''from the basin area:<br/>
 							a = <b>%.2f</b><br/>
-							b = <b>%.2f</b> <br/>
-							k = <b>%.2f</b> m <br/>
+							b = <b>%.2f</b><br/>
+							k = <b>%.2f</b><br/>
 						<br/><br/>'''%(a,b,k),para2))
 						
-	elements.append(Paragraph('''The function f(K,T) with return period Tr = %d year is = <b>%.2f</b><br/><br/>
+	elements.append(Paragraph('''The function f(K,T) with return period RP = %d year is = <b>%.2f</b><br/><br/>
 							local rainfall height (h=aD<sup>b</sup>f) = <b>%.2f</b> mm<br/><br/>
 							with D = Tc<br/><br/>
 							Areal rainfall height Ha = <b>%.2f</b> mm<br/><br/>with:<br/>
@@ -145,11 +152,19 @@ def main():
 	TR=options['time'] #TODO Time of concentration
 	outlet=options['outlets']
 	outlets = outlet.split(',')
+	cleanTemporary = options['clean']
 	try:
 		TR=int(TR)
 	except:
 		print 'TR is not a number'
 		sys.exit()
+	
+	if cleanTemporary != 'no':
+		grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
+		
+		grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
+		grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
+	
 	grass.use_temp_region()
 	#get region in order to estimate the threshold as 1/1000 of total cells
 	grass.run_command('g.region',raster=dem)
@@ -261,10 +276,11 @@ def main():
 	# ~ aMain_stat=32.5
 	# ~ bMain_stat=0.33
 	# ~ kMain_stat=0.42
-	# ~ CN=90
+	# ~ CN=91.
 	# ~ area_basin=61.5
 	# ~ area_basin_Ha=area_basin*100
-	
+	CN = 70.12/82.63 * CN
+	#CN = 78.6
 	#####--------------------------#####
 	
 	f_K_T = 1-kMain_stat*(0.45+0.799*np.log(-np.log(1-1./TR)))
@@ -393,10 +409,11 @@ def main():
 		grass.run_command('g.rename',raster='elevation,%s' % dem)
 	grass.del_temp_region()
 	grass.run_command('r.to.vect',input='basin',output='basin1',type='area',overwrite=True)
-	grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
-	
-	grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
-	grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
+	if cleanTemporary != 'no':
+		grass.run_command('g.remove',flags='f', type='raster', name='main_stream,basin,circle,drainage,horton,raster_streams,slope_drain_into')
+		
+		grass.run_command('g.remove',flags='f', type='vector', name='main_stream,nodes,outlet')
+		grass.run_command('g.remove',type='vector',pattern='main_stream*',flags='f')
 
 	    
 	
