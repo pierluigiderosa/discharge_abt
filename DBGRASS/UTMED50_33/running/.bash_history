@@ -326,3 +326,59 @@ g.remove
 ./r.discharge_abt.py dem=elevation  time=200 outlets=334736.07613,4747333.21315
 g.remove 
 exit
+v.external
+v.external input=/home/pierluigi/Dropbox/OGRS2018/dati qgis/punti_topino.shp layer=punti_topino output=punti_topino
+exit
+v.to.db -p map=punti_topino@running type=point option=coor
+r.info map=raster_streams@running
+/usr/lib/grass76/scripts/g.extension -a operation=add
+/usr/lib/grass76/scripts/g.extension -a extension=r.stream.order operation=remove
+/usr/lib/grass76/scripts/g.extension -f extension=r.stream.order operation=remove
+/usr/lib/grass76/scripts/g.extension -f extension=r.stream.order
+/usr/lib/grass76/scripts/g.extension -f extension=r.stream.stats
+ls
+cd Sviluppo/discharge_abt/
+ls
+./r.stream_power.py --help
+./r.stream_power.py
+./r.stream_power.py
+./r.stream_power.py
+./r.stream_power.py
+./r.stream_power.py --help
+./r.stream_power.py --help
+./r.stream_power.py
+./r.stream_power.py
+chmod 777 r.stream.power.list.py 
+./r.stream_power.list.py
+ls
+./r.stream.power.list.py
+./r.stream.power.list.py
+./r.stream.power.list.py
+./r.stream.power.list.py --help
+./r.stream.power.list.py --help dem=elevation points=punti_topino
+./r.stream.power.list.py --help dem=elevation points=punti_topino time=2
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+v.to.db 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+r.stream.order 
+r.stream.order 
+g.extension
+r.stream.order 
+r.mask --help
+r.mask -r
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+chmod 777 r.stream.power.list.py 
+./r.stream.power.list.py dem=elevation points=punti_topino time=2 
+cd
+exit
+g.extension.all -f
+exit
+cd Sviluppo/discharge_abt/
+./r.stream.power.list.py dem=elevation_aster points=punti_topino time=2 
+./r.stream.power.list.py 
+exit
+r.info map=elevation_aster@running
